@@ -4,22 +4,149 @@ output:
   html_document:
     keep_md: true
 ---
+<br><br>
 
+```{r setglobaloptions, echo=FALSE}
+# set up the environment; force knitr install in case it is not installed on 
+# reviewer's machine
 
-## Loading and preprocessing the data
+library(knitr)
+opts_chunk$set(echo = TRUE, message = FALSE)
+options(scipen = 1, digits = 4)
+```
 
+## Loading and preprocessing the data   
 
+After downloading and saving the zip file in the current working directory, we
+extract the activity monitoring data stored in the activity.csv file. We then 
+load the dataset into a tbl_df data frame. Finally, we convert the 'date' 
+column from factor type to date type.
 
-## What is mean total number of steps taken per day?
+```{r loaddata}
+library(lubridate)
+library(dplyr)
 
+file <- 'activity.csv'
+tdf <- tbl_df(read.csv(file))
+tdf$date <- ymd(tdf$date)  # convert factor to POSIXct date type
+output some basic dataset summary data just in case something happens to the 
+```
+<br><br>
 
+We output some summary data just in case something happens to the CSV file so 
+the person reviewing this report can quickly assess whether or not the data
+source is the same before even starting to look into all the details of the 
+analysis.
+
+```{r summary_data}
+str(tdf)
+summary(tdf)
+```
+<br><br><br>
+
+## What is the mean total number of steps taken per day?   
+
+We create a histogram of the total number of steps taken each day after 
+discarding any row with a 'NA' value in the 'steps' column.   
+
+```{r histogram}
+tsd <- tdf %>% group_by(date) %>% summarize(total_steps_day = sum(steps, na.rm = TRUE))
+hist(tsd$total_steps_day, main = 'Histogram of total steps each day', xlab = 'Total steps')
+```
+<br><br>
+
+The code used to produce the mean and median is:
+
+```{r mean_median}
+# note that NAs have already been removed by the code above in the call to sum()
+mmd <- tsd %>% summarize(mean = mean(total_steps_day), median = median(total_steps_day))
+```
+
+The **mean** total number of steps taken per day is **`r mmd$mean`** and the 
+**median** total number of steps taken per day is **`r mmd$media`**.  
+<br><br><br>
 
 ## What is the average daily activity pattern?
 
+The plot showing the average number of steps for each interval in a day across 
+all days is produced by the following code:   
 
+```{r timeseries_plot}
+ctdf <- complete.cases(tdf)
+iads <- tdf[ctdf, ] %>% group_by(interval) %>% summarize(davg = mean(steps))
+plot(iads$interval, iads$davg, type = 'l', main = 'Avg Daily Activity', xlab = '5-min interval', ylab = 'Avg Steps')
+```
+
+
+```{r max_interval}
+max_interval <- iads[max(iads$davg) == iads$davg, 'interval']
+```
+The 5-minute interval that contains the maximum number of steps on average across all the days in the dataset is **`r max_interval`**.
+<br><br><br>
 
 ## Imputing missing values
 
+The following code displays the total number of rows in the dataset that contain 
+at least 1 missing value.
+
+```{r totalNA}
+totalNAs <- sum(is.na(tdf))
+```
+
+The total number of rows missing some values thus is **`r totalNAs`**.
+
+The strategy we will use to fill in all the missing values consists in taking
+the average number of steps for a particular interval over the whole period under
+consideration and use that value in lieu of the missing one. These averages are
+already available as they have been computed above and stored in the 'iads' 
+variable. For convenience, we repeat the code here:
+
+```{r interval_avg}
+iads <- tdf[ctdf, ] %>% group_by(interval) %>% summarize(davg = mean(steps))
+```
+
+We now create a new dataset equal to the original one but with the missing 
+data filled in. To do so efficiently, we need the data.table library.
+
+```{r missing_data_replace}
+# use data.table for in place mutation as it's more elegant than a bunch of
+# loops and avoids more awkward and convoluted syntax (the S people didn't
+# know how to design a programming language properly; what a shame)
+library(data.table)
+
+dt <- as.data.table(tdf)
+dt$steps <- as.numeric(dt$steps)
+dt[is.na(steps) & interval %in% iads$interval, steps := iads$davg]
+```
+
+We now make a new histogram of the total number of steps taken each day.
+
+```{r new_histogram}
+# since NAs have been removed, for efficiency no need to use na.rm arg
+ntsd <- dt %>% group_by(date) %>% summarize(total_steps_day = sum(steps)) 
+hist(ntsd$total_steps_day, main = 'Histogram of total steps each day (no NAs)', xlab = 'Total steps')
+```
+<br><br>
+
+Finally, we compute the mean and median again but this time based on the new 
+values used to replace NAs:
+
+```{r new_mean_median}
+nmmd <- ntsd %>% summarize(mean = mean(total_steps_day), median = median(total_steps_day))
+```
+
+The new **mean** total number of steps taken per day is **`r nmmd$mean`** and 
+the new **median** total number of steps taken per day is **`r nmmd$media`**.  Interestingly, 
+these values are quite different from the previous estimates. It appears that 
+the impact of imputing missing data affects the skew of the distribution.
+<br><br><br>
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r wkdays_wkends}
+library(ggplot2)
+dt$daytype <- as.factor(ifelse(weekdays(dt$date) %in% c("Saturday", "Sunday"),'weekend','weekday'))
+iads_by_daytype <- dt %>% group_by(interval, daytype) %>% summarize(davg = mean(steps))
+qplot(interval, davg, data = iads_by_daytype, facets = daytype.~, geom = 'path', main = 'Weekday vs weekend activity patterns') 
+```
