@@ -16,7 +16,7 @@ options(scipen = 1, digits = 4)
 ```
 
 ## Loading and preprocessing the data   
-
+<br>
 After downloading and saving the zip file in the current working directory, we
 extract the activity monitoring data stored in the activity.csv file. We then 
 load the dataset into a tbl_df data frame. Finally, we convert the 'date' 
@@ -27,7 +27,7 @@ library(lubridate)
 library(dplyr)
 
 file <- 'activity.csv'
-tdf <- tbl_df(read.csv(file))
+tdf <- tbl_df(read.csv(file))  # tdf = table data frame
 tdf$date <- ymd(tdf$date)  # convert factor to POSIXct date type
 ```
 <br><br>
@@ -44,12 +44,12 @@ summary(tdf)
 <br><br><br>
 
 ## What is the mean total number of steps taken per day?   
-
+<br>
 We create a histogram of the total number of steps taken each day after 
 discarding any row with a 'NA' value in the 'steps' column.   
 
 ```{r histogram}
-tsd <- tdf %>% group_by(date) %>% summarize(total_steps_day = sum(steps, na.rm = TRUE))
+tsd <- tdf %>% group_by(date) %>% summarize(total_steps_day = sum(steps, na.rm = TRUE))  # tsd = total steps per day
 hist(tsd$total_steps_day, main = 'Histogram of total steps each day', xlab = 'Total steps')
 ```
 <br><br>
@@ -58,7 +58,7 @@ The code used to produce the mean and median is:
 
 ```{r mean_median}
 # note that NAs have already been removed by the code above in the call to sum()
-mmd <- tsd %>% summarize(mean = mean(total_steps_day), median = median(total_steps_day))
+mmd <- tsd %>% summarize(mean = mean(total_steps_day), median = median(total_steps_day))  # mmd = mean median across days
 ```
 
 The **mean** total number of steps taken per day is **`r mmd$mean`** and the 
@@ -66,13 +66,13 @@ The **mean** total number of steps taken per day is **`r mmd$mean`** and the
 <br><br><br>
 
 ## What is the average daily activity pattern?
-
-The plot showing the average number of steps for each interval in a day across 
-all days is produced by the following code:   
+<br>
+The plot showing the daily average number of steps for each interval (averaged across 
+all days) is produced by the following code:   
 
 ```{r timeseries_plot}
-ctdf <- complete.cases(tdf)
-iads <- tdf[ctdf, ] %>% group_by(interval) %>% summarize(davg = mean(steps))
+ctdf <- complete.cases(tdf)  # work only with non-missing values; ctdf = complete table data frame
+iads <- tdf[ctdf, ] %>% group_by(interval) %>% summarize(davg = mean(steps))  # iads = interval average daily steps; davg = daily average
 plot(iads$interval, iads$davg, type = 'l', main = 'Avg Daily Activity', xlab = '5-min interval', ylab = 'Avg Steps')
 ```
 
@@ -80,11 +80,11 @@ plot(iads$interval, iads$davg, type = 'l', main = 'Avg Daily Activity', xlab = '
 ```{r max_interval}
 max_interval <- iads[max(iads$davg) == iads$davg, 'interval']
 ```
-The 5-minute interval that contains the maximum number of steps on average across all the days in the dataset is **`r max_interval`**.
+The 5-minute interval that contains the maximum number of steps on average across all days in the dataset is **`r max_interval`**.
 <br><br><br>
 
 ## Imputing missing values
-
+<br>
 The following code displays the total number of rows in the dataset that contain 
 at least 1 missing value.
 
@@ -115,9 +115,10 @@ library(data.table)
 
 dt <- as.data.table(tdf)
 dt$steps <- as.numeric(dt$steps)
-dt[is.na(steps) & interval %in% iads$interval, steps := iads$davg]
+# using data.table syntax, we test for the condition and if true, directly assign the new value by reference
+dt[is.na(steps) & interval %in% iads$interval, steps := iads$davg]   
 ```
-
+<br>
 We now make a new histogram of the total number of steps taken each day.
 
 ```{r new_histogram}
@@ -131,6 +132,7 @@ Finally, we compute the mean and median again but this time based on the new
 values used to replace NAs:
 
 ```{r new_mean_median}
+# nmmd = new mean median across days
 nmmd <- ntsd %>% summarize(mean = mean(total_steps_day), median = median(total_steps_day))
 ```
 
@@ -142,14 +144,14 @@ the impact of imputing missing data affects the skew of the distribution.
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
-
-To explore whether or not there are differences in activity patterns between weekdays and weekends, we first create 2 factors to categorize days by their type, namely: 'weekday' and 'weekend'.  Then we group over intervals and day types and compute the mean for each interval by each day type. Finally, we plot the result with qplot.
+<br>
+To explore whether or not there are differences in activity patterns between weekdays and weekends, we first create 2 factors to categorize days by their type, namely: 'weekday' and 'weekend'.  Then we group over intervals and day types, and compute the mean for each interval by each day type. Finally, we plot the result with qplot.
 
 ```{r wkdays_wkends}
 library(ggplot2)
-dt$daytype <- as.factor(ifelse(weekdays(dt$date) %in% c('Saturday', 'Sunday'), 'weekend', 'weekday'))
+dt$daytype <- as.factor(ifelse(weekdays(dt$date) %in% c('Saturday', 'Sunday'), 'weekend', 'weekday'))  # dt = data.table
 iads_by_daytype <- dt %>% group_by(interval, daytype) %>% summarize(davg = mean(steps))
 qplot(interval, davg, data = iads_by_daytype, geom = 'path', main = 'Weekday vs weekend activity patterns', ylab = 'Number of steps') + facet_wrap(~ daytype, nrow = 2)
 ```
 
-We can see from the plot that 
+We can see from the plot that there are indeed differences in activity between week days and weekends. For instance, there is more activity on week days than on weekends during the hours preceding 10 am, whereas on the weekend activity surpasses that of week days between 10 am and 4 pm, or thereabouts. Presumably people sit more during the week because of work, and on the weekend since they are not so constrained, they move about more in the afternoon while they sleep more in the morning.
