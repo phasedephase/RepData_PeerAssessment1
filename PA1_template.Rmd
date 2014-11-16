@@ -29,12 +29,11 @@ library(dplyr)
 file <- 'activity.csv'
 tdf <- tbl_df(read.csv(file))
 tdf$date <- ymd(tdf$date)  # convert factor to POSIXct date type
-output some basic dataset summary data just in case something happens to the 
 ```
 <br><br>
 
-We output some summary data just in case something happens to the CSV file so 
-the person reviewing this report can quickly assess whether or not the data
+We output some basic summary data just in case something happens to the CSV file 
+so the person reviewing this report can quickly assess whether or not the data
 source is the same before even starting to look into all the details of the 
 analysis.
 
@@ -144,9 +143,13 @@ the impact of imputing missing data affects the skew of the distribution.
 
 ## Are there differences in activity patterns between weekdays and weekends?
 
+To explore whether or not there are differences in activity patterns between weekdays and weekends, we first create 2 factors to categorize days by their type, namely: 'weekday' and 'weekend'.  Then we group over intervals and day types and compute the mean for each interval by each day type. Finally, we plot the result with qplot.
+
 ```{r wkdays_wkends}
 library(ggplot2)
-dt$daytype <- as.factor(ifelse(weekdays(dt$date) %in% c("Saturday", "Sunday"),'weekend','weekday'))
+dt$daytype <- as.factor(ifelse(weekdays(dt$date) %in% c('Saturday', 'Sunday'), 'weekend', 'weekday'))
 iads_by_daytype <- dt %>% group_by(interval, daytype) %>% summarize(davg = mean(steps))
-qplot(interval, davg, data = iads_by_daytype, facets = daytype.~, geom = 'path', main = 'Weekday vs weekend activity patterns') 
+qplot(interval, davg, data = iads_by_daytype, geom = 'path', main = 'Weekday vs weekend activity patterns', ylab = 'Number of steps') + facet_wrap(~ daytype, nrow = 2)
 ```
+
+We can see from the plot that 
